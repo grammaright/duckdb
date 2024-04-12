@@ -96,6 +96,8 @@ unique_ptr<CopyStatement> Transformer::TransformCopy(duckdb_libpgquery::PGCopySt
 		info.format = "parquet";
 	} else if (ReplacementScan::CanReplace(info.file_path, {"json", "jsonl", "ndjson"})) {
 		info.format = "json";
+	} else if (ReplacementScan::CanReplace(info.file_path, {"tilestore"})) {
+		info.format = "tilestore";
 	} else {
 		info.format = "csv";
 	}
