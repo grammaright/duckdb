@@ -589,6 +589,8 @@ include_directories(third_party/mbedtls/include)
 include_directories(third_party/jaro_winkler)
 include_directories(third_party/yyjson/include)
 
+include_directories("$ENV{PREVISION_PATH}/src/include")
+
 # todo only regenerate ub file if one of the input files changed hack alert
 function(enable_unity_build UB_SUFFIX SOURCE_VARIABLE_NAME)
   set(files ${${SOURCE_VARIABLE_NAME}})
