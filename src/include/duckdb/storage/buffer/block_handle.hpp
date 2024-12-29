@@ -103,6 +103,7 @@ public:
 	bool IsUnloaded() {
 		return state == BlockState::BLOCK_UNLOADED;
 	}
+	static bool CallbackForBufferEvictiable(void *ptr);
 
 private:
 	static BufferHandle Load(shared_ptr<BlockHandle> &handle, unique_ptr<FileBuffer> buffer = nullptr);

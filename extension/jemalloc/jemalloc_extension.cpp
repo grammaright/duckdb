@@ -28,22 +28,22 @@ std::string JemallocExtension::Name() {
 }
 
 data_ptr_t JemallocExtension::Allocate(PrivateAllocatorData *private_data, idx_t size) {
-	std::cerr << "Allocate(" << size << ")" << std::endl;
-	return data_ptr_cast(BF_shm_malloc(_mspace_data, size));
+	auto res = data_ptr_cast(BF_AllocBuf(size));
 	// return data_ptr_cast(duckdb_jemalloc::je_malloc(size));
+	// BF_shm_print_stats(_mspace_data);
+	// std::cerr << (void*) res << " = Allocate(" << size << ")" << std::endl;
+	return res;
 }
 
 void JemallocExtension::Free(PrivateAllocatorData *private_data, data_ptr_t pointer, idx_t size) {
-	std::cerr << "Free(" << std::hex << (void*) pointer << ")" << std::endl;
-	BF_shm_free(_mspace_data, pointer);
-	// duckdb_jemalloc::je_free(pointer);
+	// std::cerr << "Free(" << std::hex << (void*) pointer << ")" << std::endl;
+	BF_FreeBuf(pointer);
 }
 
 data_ptr_t JemallocExtension::Reallocate(PrivateAllocatorData *private_data, data_ptr_t pointer, idx_t old_size,
                                          idx_t size) {
-	std::cerr << "Reallocate(" << std::hex << (void*) pointer << ", " << size << ")" << std::endl;
-	return data_ptr_cast(BF_shm_realloc(_mspace_data, pointer, size));
-	// return data_ptr_cast(duckdb_jemalloc::je_realloc(pointer, size));
+	// std::cerr << "Reallocate(" << std::hex << (void*) pointer << ", " << size << ")" << std::endl;
+	return data_ptr_cast(BF_ReallocBuf(pointer, size));
 }
 
 static void JemallocCTL(const char *name, void *old_ptr, size_t *old_len, void *new_ptr, size_t new_len) {

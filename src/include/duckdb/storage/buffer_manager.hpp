@@ -28,8 +28,7 @@ class BufferManager {
 	friend class BlockManager;
 
 public:
-	BufferManager() {
-	}
+	BufferManager();
 	virtual ~BufferManager() {
 	}
 

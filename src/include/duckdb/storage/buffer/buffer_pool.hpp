@@ -55,6 +55,11 @@ public:
 
 	TemporaryMemoryManager &GetTemporaryMemoryManager();
 
+	static void CallbackForBufferEviction(void *ptr);
+
+	static unordered_map<void *, weak_ptr<BlockHandle>> inserted;
+	static mutex listLock;
+
 protected:
 	//! Evict blocks until the currently used memory + extra_memory fit, returns false if this was not possible
 	//! (i.e. not enough blocks could be evicted)
@@ -137,5 +142,6 @@ protected:
 	//! A pre-allocated vector of eviction nodes. We reuse this to keep the allocation overhead of purges small.
 	vector<BufferEvictionNode> purge_nodes;
 };
+
 
 } // namespace duckdb

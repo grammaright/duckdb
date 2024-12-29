@@ -5,7 +5,13 @@
 #include "duckdb/parallel/concurrentqueue.hpp"
 #include "duckdb/storage/temporary_memory_manager.hpp"
 
+#include <iostream>
+#include "buffer/bf.h"
+
 namespace duckdb {
+
+mutex BufferPool::listLock;
+unordered_map<void *, weak_ptr<BlockHandle>> BufferPool::inserted;
 
 typedef duckdb_moodycamel::ConcurrentQueue<BufferEvictionNode> eviction_queue_t;
 
@@ -52,12 +58,11 @@ BufferPool::~BufferPool() {
 }
 
 bool BufferPool::AddToEvictionQueue(shared_ptr<BlockHandle> &handle) {
-
 	// The block handle is locked during this operation (Unpin),
 	// or the block handle is still a local variable (ConvertToPersistent)
 
 	D_ASSERT(handle->readers == 0);
-	auto ts = ++handle->eviction_seq_num;
+	// auto ts = ++handle->eviction_seq_num;
 	if (track_eviction_timestamps) {
 		handle->lru_timestamp_msec =
 		    std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now())
@@ -65,18 +70,29 @@ bool BufferPool::AddToEvictionQueue(shared_ptr<BlockHandle> &handle) {
 		        .count();
 	}
 
-	BufferEvictionNode evict_node(weak_ptr<BlockHandle>(handle), ts);
-	queue->q.enqueue(evict_node);
-
-	if (ts != 1) {
-		// we add a newer version, i.e., we kill exactly one previous version
-		IncrementDeadNodes();
+	// std::cerr << "BF_AddDuckdbBuf(" << (void *)handle.get() << "[" << (void *)(*handle).buffer.get() << "])"
+	//           << std::endl;
+	if (BF_AddDuckdbBuf(handle.get()) != BFE_OK) {
+		throw InternalException("BF_AddDuckdbBuf failed!");
 	}
 
-	if (++evict_queue_insertions % INSERT_INTERVAL == 0) {
-		return true;
-	}
+	// to prevent the block be released
+	inserted[handle.get()] = weak_ptr<BlockHandle>(handle);
+
 	return false;
+
+	// BufferEvictionNode evict_node(weak_ptr<BlockHandle>(handle), ts);
+	// queue->q.enqueue(evict_node);
+
+	// if (ts != 1) {
+	// 	// we add a newer version, i.e., we kill exactly one previous version
+	// 	IncrementDeadNodes();
+	// }
+
+	// if (++evict_queue_insertions % INSERT_INTERVAL == 0) {
+	// 	return true;
+	// }
+	// return false;
 }
 
 void BufferPool::UpdateUsedMemory(MemoryTag tag, int64_t size) {
@@ -105,41 +121,38 @@ TemporaryMemoryManager &BufferPool::GetTemporaryMemoryManager() {
 	return *temporary_memory_manager;
 }
 
+void BufferPool::CallbackForBufferEviction(void *ptr) {
+	auto handle_raw = (BlockHandle *)ptr;
+
+	// std::cerr << "CallbackForBufferEviction(" << (void *)handle_raw << ")" << std::endl;
+	// BF_ShowLists();
+
+	// unload if the block has not been released
+	auto handle = inserted[handle_raw].lock();
+	if (handle) {
+		// release the memory and mark the block as unloaded
+		handle->Unload();
+		handle->lock.unlock();
+	}
+
+	inserted.erase(handle_raw);
+	BufferPool::listLock.unlock();
+}
+
 BufferPool::EvictionResult BufferPool::EvictBlocks(MemoryTag tag, idx_t extra_memory, idx_t memory_limit,
                                                    unique_ptr<FileBuffer> *buffer) {
 	TempBufferPoolReservation r(tag, *this, extra_memory);
-	bool found = false;
 
-	if (current_memory <= memory_limit) {
-		return {true, std::move(r)};
-	}
+	// std::cerr << "BF_claim_memory(" << (int)tag << ", " << extra_memory << ", " << memory_limit << ")" << std::endl;
 
-	IterateUnloadableBlocks([&](BufferEvictionNode &, const shared_ptr<BlockHandle> &handle) {
-		// hooray, we can unload the block
-		if (buffer && handle->buffer->AllocSize() == extra_memory) {
-			// we can re-use the memory directly
-			*buffer = handle->UnloadAndTakeBlock();
-			found = true;
-			return false;
-		}
-
-		// release the memory and mark the block as unloaded
-		handle->Unload();
-
-		if (current_memory <= memory_limit) {
-			found = true;
-			return false;
-		}
-
-		// Continue iteration
-		return true;
-	});
-
-	if (!found) {
+	// claim memory
+	if (BF_claim_memory(_mspace_data, extra_memory) != BFE_OK) {
+		std::cerr << "BF_claim_memory failed with extra_memory=" << extra_memory << ", mem_limit=" << memory_limit << std::endl;
 		r.Resize(0);
+		return {false, std::move(r)};
 	}
 
-	return {found, std::move(r)};
+	return {true, std::move(r)};
 }
 
 idx_t BufferPool::PurgeAgedBlocks(uint32_t max_age_sec) {
@@ -225,6 +238,8 @@ void BufferPool::PurgeIteration(const idx_t purge_size) {
 }
 
 void BufferPool::PurgeQueue() {
+	// DO NOTHING
+	return;
 
 	// only one thread purges the queue, all other threads early-out
 	if (!purge_lock.try_lock()) {

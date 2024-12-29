@@ -61,6 +61,7 @@ shared_ptr<BlockHandle> BlockManager::ConvertToPersistent(block_id_t block_id, s
 	Write(*new_block->buffer, block_id);
 
 	// potentially purge the queue
+	lock_guard<mutex> listLock(BufferPool::listLock);
 	auto purge_queue = buffer_manager.GetBufferPool().AddToEvictionQueue(new_block);
 	if (purge_queue) {
 		buffer_manager.GetBufferPool().PurgeQueue();
