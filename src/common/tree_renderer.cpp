@@ -9,8 +9,12 @@
 #include "duckdb/parallel/pipeline.hpp"
 #include "duckdb/planner/logical_operator.hpp"
 #include "utf8proc_wrapper.hpp"
+#include "yyjson.hpp" 
 
 #include <sstream>
+#include <iostream>
+
+using namespace duckdb_yyjson;
 
 namespace duckdb {
 
@@ -515,5 +519,110 @@ unique_ptr<RenderTree> TreeRenderer::CreateTree(const Pipeline &pipeline) {
 	}
 	return CreateRenderTree<PipelineRenderNode>(*node);
 }
+
+/* JSONTreeRenderer */
+
+string JSONTreeRenderer::ToString(const LogicalOperator &op) {
+	std::stringstream ss;
+	Render(op, ss);
+	return ss.str();
+}
+
+string JSONTreeRenderer::ToString(const PhysicalOperator &op) {
+	std::stringstream ss;
+	Render(op, ss);
+	return ss.str();
+}
+
+string JSONTreeRenderer::ToString(const QueryProfiler::TreeNode &op) {
+	std::stringstream ss;
+	Render(op, ss);
+	return ss.str();
+}
+
+string JSONTreeRenderer::ToString(const Pipeline &op) {
+	std::stringstream ss;
+	Render(op, ss);
+	return ss.str();
+}
+
+void JSONTreeRenderer::Render(const LogicalOperator &op, std::ostream &ss) {
+	throw NotImplementedException("JSONTreeRenderer::Render for LogicalOperator not implemented");
+}
+
+void JSONTreeRenderer::Render(const PhysicalOperator &op, std::ostream &ss) {
+	ToStream<PhysicalOperator>(op, ss);
+}
+
+void JSONTreeRenderer::Render(const QueryProfiler::TreeNode &op, std::ostream &ss) {
+	throw NotImplementedException("JSONTreeRenderer::Render for QueryProfiler::TreeNode not implemented");
+}
+
+void JSONTreeRenderer::Render(const Pipeline &op, std::ostream &ss) {
+	throw NotImplementedException("JSONTreeRenderer::Render for Pipeline not implemented");
+}
+
+template <class T>
+static yyjson_mut_val *RenderRecursive(yyjson_mut_doc *doc, const PhysicalOperator &op) {
+	auto object = yyjson_mut_obj(doc);
+	yyjson_mut_obj_add_strcpy(doc, object, "name", op.GetName().c_str());
+
+	auto extra_info = yyjson_mut_obj(doc);
+	string extra_text = op.ParamsToString();
+	yyjson_mut_obj_add_strcpy(doc, extra_info, "extra_text", extra_text.c_str());
+
+	auto extraTextTokens = yyjson_mut_arr(doc);
+	if (!extra_text.empty()) {
+		auto current = yyjson_mut_arr(doc);
+		std::stringstream ss(extra_text);
+		std::string token = "";
+		while (std::getline(ss, token, '\n')) {
+			if (token == "[INFOSEPARATOR]") {
+				yyjson_mut_arr_append(extraTextTokens, current);
+				current = yyjson_mut_arr(doc);
+				continue;
+			}
+
+			yyjson_mut_arr_add_strcpy(doc, current, token.c_str());
+			// yyjson_mut_obj_add_strcpy(doc, extra_info, "extra_text", token.c_str());
+		}
+		yyjson_mut_arr_append(extraTextTokens, current);
+	}
+	yyjson_mut_obj_add_val(doc, extra_info, "extra_text_tokenized", extraTextTokens);
+	yyjson_mut_obj_add_val(doc, object, "extra_info", extra_info);
+
+	auto children = yyjson_mut_arr(doc);
+	TreeChildrenIterator::Iterate<T>(op, [&](const T &child) {
+		auto child_object = RenderRecursive<T>(doc, child);
+		yyjson_mut_arr_append(children, child_object);
+	});
+
+	yyjson_mut_obj_add_val(doc, object, "children", children);
+
+	return object;
+}
+
+template <class T>
+void JSONTreeRenderer::ToStream(const PhysicalOperator &op, std::ostream &ss) {
+	auto doc = yyjson_mut_doc_new(nullptr);
+	auto result_obj = yyjson_mut_arr(doc);
+	yyjson_mut_doc_set_root(doc, result_obj);
+
+	auto plan = RenderRecursive<T>(doc, op);
+	yyjson_mut_arr_append(result_obj, plan);
+
+	yyjson_write_err err;
+	auto data = yyjson_mut_val_write_opts(result_obj, YYJSON_WRITE_ALLOW_INF_AND_NAN | YYJSON_WRITE_PRETTY, nullptr,
+	                                      nullptr, &err);
+	if (!data) {
+		yyjson_mut_doc_free(doc);
+		std::cerr << "yyjson error: " << err.msg << std::endl;
+		throw InternalException("The plan could not be rendered as JSON, yyjson failed");
+	}
+	ss << string(data);
+	free(data);
+	yyjson_mut_doc_free(doc);
+}
+
 
 } // namespace duckdb

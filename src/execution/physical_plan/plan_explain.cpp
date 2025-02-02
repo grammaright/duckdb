@@ -18,7 +18,9 @@ unique_ptr<PhysicalOperator> PhysicalPlanGenerator::CreatePlan(LogicalExplain &o
 		return std::move(result);
 	}
 
-	op.physical_plan = plan->ToString();
+	// op.physical_plan = plan->ToString();
+	op.physical_plan = JSONTreeRenderer().ToString(*plan);
+
 	// the output of the explain
 	vector<string> keys, values;
 	switch (ClientConfig::GetConfig(context).explain_output_type) {

@@ -18,10 +18,45 @@ class PhysicalOperator;
 class Pipeline;
 struct PipelineRenderNode;
 
+// struct RenderTreeNode {
+// 	string name;
+// 	string extra_text;
+// };
+
 struct RenderTreeNode {
+public:
+	static constexpr const char *CARDINALITY = "__cardinality__";
+	static constexpr const char *ESTIMATED_CARDINALITY = "__estimated_cardinality__";
+	static constexpr const char *TIMING = "__timing__";
+
+public:
+	struct Coordinate {
+	public:
+		Coordinate(idx_t x, idx_t y) : x(x), y(y) {
+		}
+
+	public:
+		idx_t x;
+		idx_t y;
+	};
+
+	RenderTreeNode() = default;
+	RenderTreeNode(const string &name, string extra_text)
+	    : name(name), extra_text(std::move(extra_text)) {
+	}
+
+public:
+	void AddChildPosition(idx_t x, idx_t y) {
+		child_positions.emplace_back(x, y);
+	}
+
+public:
 	string name;
+	// InsertionOrderPreservingMap<string> extra_text;
 	string extra_text;
+	vector<Coordinate> child_positions;
 };
+
 
 struct RenderTree {
 	RenderTree(idx_t width, idx_t height);
@@ -145,5 +180,26 @@ private:
 	template <class T>
 	unique_ptr<RenderTree> CreateRenderTree(const T &op);
 };
+
+class JSONTreeRenderer : public TreeRenderer {
+public:
+	explicit JSONTreeRenderer() {}
+	// ~JSONTreeRenderer() override {}
+
+public:
+	string ToString(const LogicalOperator &op);
+	string ToString(const PhysicalOperator &op);
+	string ToString(const QueryProfiler::TreeNode &op);
+	string ToString(const Pipeline &op);
+
+	void Render(const LogicalOperator &op, std::ostream &ss);
+	void Render(const PhysicalOperator &op, std::ostream &ss);
+	void Render(const QueryProfiler::TreeNode &op, std::ostream &ss);
+	void Render(const Pipeline &op, std::ostream &ss);
+
+	template <class T>
+	void ToStream(const PhysicalOperator &op, std::ostream &ss);
+};
+
 
 } // namespace duckdb
