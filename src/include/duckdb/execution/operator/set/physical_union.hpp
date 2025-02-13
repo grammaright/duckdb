@@ -25,6 +25,8 @@ public:
 public:
 	void BuildPipelines(Pipeline &current, MetaPipeline &meta_pipeline) override;
 	vector<const_reference<PhysicalOperator>> GetSources() const override;
+
+	string ParamsToString() const override;
 };
 
 } // namespace duckdb

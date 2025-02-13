@@ -68,4 +68,18 @@ vector<const_reference<PhysicalOperator>> PhysicalUnion::GetSources() const {
 	return result;
 }
 
+string PhysicalUnion::ParamsToString() const {
+	string result;
+	result += StringUtil::Format("EC: %llu", estimated_cardinality);
+	result += "\n[INFOSEPARATOR]\n";
+	result += "\nTYPES: ";
+	for (idx_t i = 0; i < types.size(); i++) {
+		if (i != 0) {
+			result += ",";
+		}
+		result += types[i].ToString();
+	}
+	return result;
+}
+
 } // namespace duckdb

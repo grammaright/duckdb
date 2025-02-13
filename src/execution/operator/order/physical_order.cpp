@@ -276,6 +276,17 @@ string PhysicalOrder::ParamsToString() const {
 		result += orders[i].expression->ToString() + " ";
 		result += orders[i].type == OrderType::DESCENDING ? "DESC" : "ASC";
 	}
+	result += "\n[INFOSEPARATOR]\n";
+	result += StringUtil::Format("EC: %llu", estimated_cardinality);
+	// print the output columns
+	result += "\n[INFOSEPARATOR]\n";
+	result += "\nTYPES: ";
+	for (idx_t i = 0; i < types.size(); i++) {
+		if (i != 0) {
+			result += ",";
+		}
+		result += types[i].ToString();
+	}
 	return result;
 }
 

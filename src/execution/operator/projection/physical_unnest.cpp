@@ -368,4 +368,18 @@ OperatorResultType PhysicalUnnest::Execute(ExecutionContext &context, DataChunk 
 	return ExecuteInternal(context, input, chunk, state, select_list);
 }
 
+string PhysicalUnnest::ParamsToString() const {
+	string result;
+	result += "\n[INFOSEPARATOR]\n";
+	result += StringUtil::Format("EC: %llu", estimated_cardinality);
+	result += "\nTYPES: ";
+	for (idx_t i = 0; i < types.size(); i++) {
+		if (i != 0) {
+			result += ",";
+		}
+		result += types[i].ToString();
+	}
+	return result;
+}
+
 } // namespace duckdb

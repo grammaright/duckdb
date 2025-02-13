@@ -44,6 +44,8 @@ public:
 	static OperatorResultType ExecuteInternal(ExecutionContext &context, DataChunk &input, DataChunk &chunk,
 	                                          OperatorState &state, const vector<unique_ptr<Expression>> &select_list,
 	                                          bool include_input = true);
+
+	string ParamsToString() const override;
 };
 
 } // namespace duckdb

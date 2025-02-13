@@ -74,6 +74,17 @@ string PhysicalProjection::ParamsToString() const {
 	for (auto &expr : select_list) {
 		extra_info += expr->GetName() + "\n";
 	}
+	extra_info += "\n[INFOSEPARATOR]\n";
+	extra_info += StringUtil::Format("EC: %llu", estimated_cardinality);
+	// print the output columns
+	extra_info += "\n[INFOSEPARATOR]\n";
+	extra_info += "\nTYPES: ";
+	for (idx_t i = 0; i < types.size(); i++) {
+		if (i != 0) {
+			extra_info += ",";
+		}
+		extra_info += types[i].ToString();
+	}
 	return extra_info;
 }
 
