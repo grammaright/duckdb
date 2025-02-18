@@ -86,6 +86,10 @@ public:
 		return true;
 	}
 
+	string ParamsToString() const override {
+		return info->base->sql;
+	}
+
 public:
 	// Sink interface
 	unique_ptr<GlobalSinkState> GetGlobalSinkState(ClientContext &context) const override;

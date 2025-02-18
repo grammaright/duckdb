@@ -19,6 +19,8 @@
 #include "duckdb/transaction/local_storage.hpp"
 #include "duckdb/main/client_data.hpp"
 
+std::unordered_map<std::string, uint64_t> __tempDuckDBReplacingEC;
+
 namespace duckdb {
 
 //===--------------------------------------------------------------------===//
@@ -200,6 +202,15 @@ void TableScanDependency(LogicalDependencyList &entries, const FunctionData *bin
 
 unique_ptr<NodeStatistics> TableScanCardinality(ClientContext &context, const FunctionData *bind_data_p) {
 	auto &bind_data = bind_data_p->Cast<TableScanBindData>();
+	auto tableName = bind_data.table.name;
+	// if we get a hint from M2, use that as the cardinality
+	std::cerr << "[DUCKDB] tableName " << tableName << std::endl;
+	if (__tempDuckDBReplacingEC.find(tableName) != __tempDuckDBReplacingEC.end()) {
+		auto ec = __tempDuckDBReplacingEC[tableName];
+		std::cerr << "[DUCKDB] ec " << ec << std::endl;
+		return make_uniq<NodeStatistics>(ec, ec);
+	}
+
 	auto &local_storage = LocalStorage::Get(context, bind_data.table.catalog);
 	auto &storage = bind_data.table.GetStorage();
 	idx_t table_rows = storage.GetTotalRows();
