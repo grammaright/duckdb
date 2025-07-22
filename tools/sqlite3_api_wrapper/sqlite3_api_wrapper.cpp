@@ -30,9 +30,6 @@
 #include <thread>
 #include <time.h>
 
-#include "buffer/bf.h"
-#include <sys/stat.h>
-
 using namespace duckdb;
 using namespace std;
 
@@ -89,32 +86,11 @@ int sqlite3_open(const char *filename, /* Database filename (UTF-8) */
 	return sqlite3_open_v2(filename, ppDb, 0, NULL);
 }
 
-bool IsBFInitialized() {
-    struct stat buf;
-    int ret = stat("/dev/shm/buffertile_bf", &buf);
-    return (ret == 0);
-}
-
 int sqlite3_open_v2(const char *filename, /* Database filename (UTF-8) */
                     sqlite3 **ppDb,       /* OUT: SQLite db handle */
                     int flags,            /* Flags */
                     const char *zVfs      /* Name of VFS module to use */
 ) {
-
-	// Initialize BF if it is not initialized
-    if (!IsBFInitialized()) {
-        // It will run only if in the development of DuckDB extension
-        BF_Init();
-        fprintf(stderr,
-                "[ARRAY_EXT] BF_Init() is called because bf has not been "
-                "initialized.\n");
-    }
-
-	// Attach to buffer if not attached
-    if (_mspace_data == nullptr) {
-		BF_Attach();
-	}
-
 	if (filename && strcmp(filename, ":memory:") == 0) {
 		filename = NULL;
 	}

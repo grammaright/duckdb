@@ -11,10 +11,6 @@
 #include "duckdb/storage/temporary_memory_manager.hpp"
 #include "duckdb/storage/temporary_file_manager.hpp"
 
-#include <iostream>
-
-#include "buffer/bf.h"
-
 namespace duckdb {
 
 #ifdef DUCKDB_DEBUG_DESTROY_BLOCKS
@@ -153,10 +149,7 @@ BufferHandle StandardBufferManager::Allocate(MemoryTag tag, idx_t block_size, bo
 	// Initialize the memory with garbage data
 	WriteGarbageIntoBuffer(*(*block_ptr)->buffer);
 #endif
-	auto a = Pin(*block_ptr);
-	// std::cerr << "StandardBufferManager(" << (void *)block_ptr->get() << ", " << (void *)(*block_ptr)->buffer.get()
-	//           << ")::Allocate(" << block_size << ")" << std::endl;
-	return a;
+	return Pin(*block_ptr);
 }
 
 void StandardBufferManager::ReAllocate(shared_ptr<BlockHandle> &handle, idx_t block_size) {
@@ -165,9 +158,6 @@ void StandardBufferManager::ReAllocate(shared_ptr<BlockHandle> &handle, idx_t bl
 	D_ASSERT(handle->state == BlockState::BLOCK_LOADED);
 	D_ASSERT(handle->memory_usage == handle->buffer->AllocSize());
 	D_ASSERT(handle->memory_usage == handle->memory_charge.size);
-
-	// std::cerr << "StandardBufferManager(" << (void *)handle.get() << "," << (void *)handle->buffer.get()
-	//           << ")::ReAllocate(" << block_size << ")" << std::endl;
 
 	auto req = handle->buffer->CalculateMemory(block_size);
 	int64_t memory_delta = NumericCast<int64_t>(req.alloc_size) - NumericCast<int64_t>(handle->memory_usage);
@@ -200,8 +190,6 @@ BufferHandle StandardBufferManager::Pin(shared_ptr<BlockHandle> &handle) {
 		// lock the block
 		lock_guard<mutex> lock(handle->lock);
 		// check if the block is already loaded
-		// std::cerr << "StandardBufferManager(" << (void *)handle.get() << ", " << (void *)handle->buffer.get()
-		//           << ")::Pin(readers=" << handle->readers + 1 << ")" << std::endl;
 		if (handle->state == BlockState::BLOCK_LOADED) {
 			// the block is loaded, increment the reader count and return a pointer to the handle
 			handle->readers++;
@@ -260,10 +248,7 @@ void StandardBufferManager::VerifyZeroReaders(shared_ptr<BlockHandle> &handle) {
 void StandardBufferManager::Unpin(shared_ptr<BlockHandle> &handle) {
 	bool purge = false;
 	{
-		lock_guard<mutex> listLock(BufferPool::listLock);
 		lock_guard<mutex> lock(handle->lock);
-		// std::cerr << "StandardBufferManager(" << (void *)handle.get() << ", " << (void *)handle->buffer.get()
-		//           << ")::Unpin(readers=" << handle->readers - 1 << ")" << std::endl;
 		if (!handle->buffer || handle->buffer->type == FileBufferType::TINY_BUFFER) {
 			return;
 		}
@@ -279,8 +264,6 @@ void StandardBufferManager::Unpin(shared_ptr<BlockHandle> &handle) {
 	if (purge) {
 		PurgeQueue();
 	}
-
-	// BF_ShowLists();
 }
 
 void StandardBufferManager::SetMemoryLimit(idx_t limit) {

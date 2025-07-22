@@ -6,19 +6,9 @@
 #include "duckdb/storage/buffer/buffer_pool.hpp"
 #include "duckdb/storage/standard_buffer_manager.hpp"
 
-#include "buffer/bf.h"
-
-extern bf_duckdb_eviction_callback_t bf_duckdb_eviction_callback;
-extern bf_duckdb_evictable_callback_t bf_duckdb_evictable_callback;
-
 namespace duckdb {
 
-BufferManager::BufferManager() {
-	// Assume that BufferManager initializes only once
-	bf_duckdb_evictable_callback = BlockHandle::CallbackForBufferEvictiable;
-	bf_duckdb_eviction_callback = BufferPool::CallbackForBufferEviction;
-}
-
+BufferManager::BufferManager() {}
 shared_ptr<BlockHandle> BufferManager::RegisterSmallMemory(idx_t block_size) {
 	throw NotImplementedException("This type of BufferManager can not create 'small-memory' blocks");
 }

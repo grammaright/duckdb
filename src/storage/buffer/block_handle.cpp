@@ -6,10 +6,6 @@
 #include "duckdb/storage/buffer/buffer_pool.hpp"
 #include "duckdb/common/file_buffer.hpp"
 
-#include <iostream>
-
-#include <buffer/bf.h>
-
 namespace duckdb {
 
 BlockHandle::BlockHandle(BlockManager &block_manager, block_id_t block_id_p, MemoryTag tag)
@@ -105,9 +101,6 @@ unique_ptr<FileBuffer> BlockHandle::UnloadAndTakeBlock() {
 	D_ASSERT(!unswizzled);
 	D_ASSERT(CanUnload());
 
-	// std::cerr << "BlockHandle::UnloadAndTakeBlock(" << (int)tag << ", " << (void *)this << ", " << block_id << ")"
-	//           << std::endl;
-
 	if (block_id >= MAXIMUM_BLOCK && !can_destroy) {
 		// temporary block that cannot be destroyed: write to temporary file
 		block_manager.buffer_manager.WriteTemporaryBuffer(tag, block_id, *buffer);
@@ -120,32 +113,6 @@ unique_ptr<FileBuffer> BlockHandle::UnloadAndTakeBlock() {
 void BlockHandle::Unload() {
 	auto block = UnloadAndTakeBlock();
 	block.reset();
-}
-
-bool BlockHandle::CallbackForBufferEvictiable(void *ptr) {
-	BufferPool::listLock.lock();
-
-	auto handle_raw = (BlockHandle *)ptr;
-	// std::cerr << "BlockHandle::CallbackForBufferEvictiable(" << (void *)handle_raw << "[" << (void *)handle->buffer.get() << "])"
-	//           << std::endl;
-
-	// check if the block is not released yet
-	auto handle = BufferPool::inserted[handle_raw].lock();
-	if (!handle) {
-		// block has been released, so we can evict it
-		return true;
-	}
-
-	// if not, lock and check it is unloadable
-	handle->lock.lock();
-	if (!handle->CanUnload()) {
-		handle->lock.unlock();
-		BufferPool::listLock.unlock();
-		return false;
-	}
-
-	// lock will be released by BufferPool::CallbackForBufferEviction()
-	return true;
 }
 
 bool BlockHandle::CanUnload() {

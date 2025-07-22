@@ -1,21 +1,12 @@
 #define DUCKDB_EXTENSION_MAIN
-
-#include <iostream>
-
 #include "jemalloc_extension.hpp"
 
 #include "duckdb/common/allocator.hpp"
 #include "jemalloc/jemalloc.h"
 
-#include "buffer/bf.h"
-#include "buffer/bf_malloc.h"
-
 #ifndef DUCKDB_NO_THREADS
 #include "duckdb/common/thread.hpp"
 #endif
-
-
-extern BFmspace *_mspace_data, *_mspace_bf;
 
 namespace duckdb {
 
@@ -28,22 +19,16 @@ std::string JemallocExtension::Name() {
 }
 
 data_ptr_t JemallocExtension::Allocate(PrivateAllocatorData *private_data, idx_t size) {
-	auto res = data_ptr_cast(BF_AllocBuf(size));
-	// return data_ptr_cast(duckdb_jemalloc::je_malloc(size));
-	// BF_shm_print_stats(_mspace_data);
-	// std::cerr << (void*) res << " = Allocate(" << size << ")" << std::endl;
-	return res;
+	return data_ptr_cast(duckdb_jemalloc::je_malloc(size));
 }
 
 void JemallocExtension::Free(PrivateAllocatorData *private_data, data_ptr_t pointer, idx_t size) {
-	// std::cerr << "Free(" << std::hex << (void*) pointer << ")" << std::endl;
-	BF_FreeBuf(pointer);
+	duckdb_jemalloc::je_free(pointer);
 }
 
 data_ptr_t JemallocExtension::Reallocate(PrivateAllocatorData *private_data, data_ptr_t pointer, idx_t old_size,
                                          idx_t size) {
-	// std::cerr << "Reallocate(" << std::hex << (void*) pointer << ", " << size << ")" << std::endl;
-	return data_ptr_cast(BF_ReallocBuf(pointer, size));
+	return data_ptr_cast(duckdb_jemalloc::je_realloc(pointer, size));
 }
 
 static void JemallocCTL(const char *name, void *old_ptr, size_t *old_len, void *new_ptr, size_t new_len) {
@@ -73,9 +58,6 @@ static T GetJemallocCTL(const char *name) {
 }
 
 void JemallocExtension::ThreadFlush(idx_t threshold) {
-	return;
-
-	std::cerr << "ThreadFlush(" << threshold << ")" << std::endl;
 	// We flush after exceeding the threshold
 	if (GetJemallocCTL<uint64_t>("thread.peak.read") < threshold) {
 		return;
@@ -93,9 +75,6 @@ void JemallocExtension::ThreadFlush(idx_t threshold) {
 }
 
 void JemallocExtension::FlushAll() {
-	return;
-
-	std::cerr << "FlushAll()" << std::endl;
 	// Flush thread-local cache
 	SetJemallocCTL("thread.tcache.flush");
 
